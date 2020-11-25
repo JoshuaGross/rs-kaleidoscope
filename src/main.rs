@@ -1,7 +1,6 @@
 extern crate nom;
 use nom::{
   branch::alt,
-  map_res,
   bytes::complete::is_a,
   character::complete::one_of,
   combinator::recognize,
@@ -71,15 +70,6 @@ fn main() {
   println!("foo")
 }
 
-macro_rules! assert_parsed_fully {
-    ($parser:expr, $input:expr, $result:expr) => {
-        assert_eq!(
-            $parser($input),
-            Ok((&b""[..], $result))
-        );
-    }
-}
-
 #[test]
 fn parse_expr_test() {
   assert_eq!(parse_expr("1.1"), Ok(("", Expr::Float(1.1))));
@@ -89,5 +79,6 @@ fn parse_expr_test() {
 
   // TODO: figure out how to test errors
   //assert_eq!(parse_expr("1five"), Err(nom::Err::Error("five", nom::Err::Eof)));
+  assert_eq!(parse_expr("1five"), Err(nom::Err::Error(nom::error::Error::new(&"five"[..], nom::error::ErrorKind::Eof))));
 }
 
