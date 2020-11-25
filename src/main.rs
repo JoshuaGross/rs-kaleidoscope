@@ -15,14 +15,14 @@ type Name = String;
 #[derive(Debug,PartialEq)]
 enum Expr {
   Float(f32),
-  BinOp(Op, Box<Expr>, Box<Expr>),
   Var(Name),
+  /*BinOp(Op, Box<Expr>, Box<Expr>),
   Call(Name, ExprList),
   Function(Name, ExprList, Box<Expr>),
-  Extern(Name, ExprList)
+  Extern(Name, ExprList)*/
 }
 
-#[derive(Debug,PartialEq)]
+/*#[derive(Debug,PartialEq)]
 enum ExprList {
   Cons(Box<Expr>, Box<ExprList>),
   Nil
@@ -34,7 +34,7 @@ enum Op {
   Minus,
   Multiply,
   Divide
-}
+}*/
 
 fn parse_float(input: &str) -> IResult<&str, Expr> {
   // FIXME: error handling?
