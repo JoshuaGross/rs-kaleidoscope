@@ -24,5 +24,8 @@ fn parse_expr_test() {
   // Parse basic arithmetic
   assert_eq!(parser::parse_program("five+1.4"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Var("five".to_string())), Box::new(Expr::Float(1.4)))])));
   assert_eq!(parser::parse_program("five + 1.4"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Var("five".to_string())), Box::new(Expr::Float(1.4)))])));
+
+  // Parse arithmetic with precedence
+  assert_eq!(parser::parse_program("5 + 6 * 7"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Float(5.0)), Box::new(Expr::BinOp(Op::Multiply, Box::new(Expr::Float(6.0)), Box::new(Expr::Float(7.0)))))])));
 }
 

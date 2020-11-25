@@ -39,9 +39,27 @@ pub enum Op {
   Divide
 }
 
-fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
+fn parse_bin_op2(s: &str) -> IResult<&str, Expr> {
   // Parse left/first expr
   let (s, init) = parse_term(s)?;
+
+  // fold expressions
+  fold_many0(
+    pair(
+      alt((
+        map(char('*'), |_| Op::Multiply),
+        map(char('/'), |_| Op::Divide)
+      )),
+      parse_term
+    ),
+    init,
+    |acc, (op, val)| Expr::BinOp(op, Box::new(acc), Box::new(val))
+  )(s)
+}
+
+fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
+  // Parse left/first expr
+  let (s, init) = parse_bin_op2(s)?;
 
   // fold expressions
   fold_many0(
@@ -50,7 +68,7 @@ fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
         map(char('+'), |_| Op::Plus),
         map(char('-'), |_| Op::Minus)
       )),
-      parse_term
+      parse_bin_op2
     ),
     init,
     |acc, (op, val)| Expr::BinOp(op, Box::new(acc), Box::new(val))
