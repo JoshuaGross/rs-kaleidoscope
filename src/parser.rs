@@ -20,7 +20,7 @@ pub enum Expr {
   BinOp(Op, Box<Expr>, Box<Expr>),
   Call(Name, Program),
   Function(Name, Vec<Name>, Program),
-  /*Extern(Name, ExprList)*/
+  Extern(Name, Vec<Name>)
 }
 
 pub type Program = Vec<Expr>;
@@ -117,9 +117,17 @@ fn parse_fn_def(s: &str) -> IResult<&str, Expr> {
   let (s, expr_list) = parse_program_partial(s)?;
   let (s, _) = delimited(space0, is_a("}"), space0)(s)?;
 
-  //Ok((s, Expr::Function(name, ident_list, Vec::new())))
   Ok((s, Expr::Function(name, ident_list, expr_list)))
-  //Ok((s, Expr::Function(name, Vec::new(), Vec::new())))
+}
+
+fn parse_extern_decl(s: &str) -> IResult<&str, Expr> {
+  let (s, _) = delimited(space0, tag("extern "), space0)(s)?;
+  let (s, name) = parse_ident(s)?;
+  let (s, _) = delimited(space0, is_a("("), space0)(s)?;
+  let (s, ident_list) = separated_list0(tag(" "), parse_ident)(s)?;
+  let (s, _) = delimited(space0, is_a(")"), space0)(s)?;
+
+  Ok((s, Expr::Extern(name, ident_list)))
 }
 
 fn parse_term(s: &str) -> IResult<&str, Expr> {
@@ -134,7 +142,7 @@ fn parse_parenthetical_term(s: &str) -> IResult<&str, Expr> {
 }
 
 pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
-  return alt((parse_fn_def, parse_bin_op1))(s);
+  return alt((parse_extern_decl, parse_fn_def, parse_bin_op1))(s);
 }
 
 fn parse_program_partial(s: &str) -> IResult<&str, Program> {
