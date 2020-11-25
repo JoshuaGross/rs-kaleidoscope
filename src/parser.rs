@@ -83,13 +83,13 @@ fn parse_var(s: &str) -> IResult<&str, Expr> {
 }
 
 pub fn parse_term(s: &str) -> IResult<&str, Expr> {
-  return delimited(space0, alt((parse_float, parse_var)))(s);
+  return delimited(space0, alt((parse_float, parse_var)), space0)(s);
 }
 
 pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
-  return delimited(space0, alt((parse_bin_op1, parse_term)))(s);
+  return delimited(space0, alt((parse_bin_op1, parse_term)), space0)(s);
 }
 
 pub fn parse_program(s: &str) -> IResult<&str, Program> {
-  return nom::combinator::all_consuming(separated_list1(delimited(space0, tag(";")), delimited(space0, parse_expr)))(s);
+  return nom::combinator::all_consuming(separated_list1(tag(";"), parse_expr))(s);
 }

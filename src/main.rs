@@ -19,9 +19,10 @@ fn parse_expr_test() {
 
   // Errors with basic parsing
   assert_eq!(parser::parse_program("1five"), Err(nom::Err::Error(nom::error::Error::new(&"five"[..], nom::error::ErrorKind::Eof))));
-  assert_eq!(parser::parse_program("five 1"), Err(nom::Err::Error(nom::error::Error::new(&" 1"[..], nom::error::ErrorKind::Eof))));
+  assert_eq!(parser::parse_program("five 1"), Err(nom::Err::Error(nom::error::Error::new(&"1"[..], nom::error::ErrorKind::Eof))));
 
   // Parse basic arithmetic
   assert_eq!(parser::parse_program("five+1.4"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Var("five".to_string())), Box::new(Expr::Float(1.4)))])));
+  assert_eq!(parser::parse_program("five + 1.4"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Var("five".to_string())), Box::new(Expr::Float(1.4)))])));
 }
 
