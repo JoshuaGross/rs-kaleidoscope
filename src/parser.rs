@@ -5,15 +5,15 @@ use nom::{
   bytes::complete::{is_a, tag},
   character::complete::{char, one_of},
   combinator::{map, recognize},
-  sequence::preceded,
-  multi::separated_list1,
+  sequence::{pair, preceded},
+  multi::{fold_many0, separated_list1},
   number::complete,
   IResult
 };
 
 type Name = String;
 
-#[derive(Debug,PartialEq)]
+#[derive(Clone, Debug,PartialEq)]
 pub enum Expr {
   Float(f32),
   Var(Name),
@@ -23,7 +23,6 @@ pub enum Expr {
   Extern(Name, ExprList)*/
 }
 
-
 pub type Program = Vec<Expr>;
 
 /*#[derive(Debug,PartialEq)]
@@ -32,7 +31,7 @@ enum ExprList {
   Nil
 }*/
 
-#[derive(Debug,PartialEq)]
+#[derive(Clone, Debug,PartialEq)]
 pub enum Op {
   Plus,
   Minus,
@@ -40,22 +39,22 @@ pub enum Op {
   Divide
 }
 
-fn parse_bin_op(s: &str) -> IResult<&str, Expr> {
-  // Parse left expr
-  let (s, left_expr) = parse_expr(s)?;
+fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
+  // Parse left/first expr
+  let (s, init) = parse_term(s)?;
 
-  // Find binary op
-  let (s, op) = alt((
-    map(char('+'), |_| Op::Plus),
-    map(char('-'), |_| Op::Minus),
-    map(char('*'), |_| Op::Multiply),
-    map(char('/'), |_| Op::Divide),
-  ))(s)?;
-
-  // Parse right expr
-  let (s, right_expr) = parse_expr(s)?;
-
-  Ok((s, Expr::BinOp(op, Box::new(left_expr), Box::new(right_expr))))
+  // fold expressions
+  fold_many0(
+    pair(
+      alt((
+        map(char('+'), |_| Op::Plus),
+        map(char('-'), |_| Op::Minus)
+      )),
+      parse_term
+    ),
+    init,
+    |acc, (op, val)| Expr::BinOp(op, Box::new(acc), Box::new(val))
+  )(s)
 }
 
 fn parse_float(s: &str) -> IResult<&str, Expr> {
@@ -83,8 +82,12 @@ fn parse_var(s: &str) -> IResult<&str, Expr> {
   Ok((s, Expr::Var(ident.to_string())))
 }
 
+pub fn parse_term(s: &str) -> IResult<&str, Expr> {
+  return alt((parse_float, parse_var))(s);
+}
+
 pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
-  return alt((parse_bin_op, parse_float, parse_var))(s);
+  return alt((parse_bin_op1, parse_term))(s);
 }
 
 pub fn parse_program(s: &str) -> IResult<&str, Program> {

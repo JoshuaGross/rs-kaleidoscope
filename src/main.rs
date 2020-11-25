@@ -1,6 +1,6 @@
 mod parser;
 
-use parser::{Expr};
+use parser::{Expr, Op};
 
 fn main() {
   println!("foo")
@@ -21,6 +21,7 @@ fn parse_expr_test() {
   assert_eq!(parser::parse_program("1five"), Err(nom::Err::Error(nom::error::Error::new(&"five"[..], nom::error::ErrorKind::Eof))));
   assert_eq!(parser::parse_program("five 1"), Err(nom::Err::Error(nom::error::Error::new(&" 1"[..], nom::error::ErrorKind::Eof))));
 
-  // Parse multiple statements
+  // Parse basic arithmetic
+  assert_eq!(parser::parse_program("five+1.4"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Var("five".to_string())), Box::new(Expr::Float(1.4)))])));
 }
 
