@@ -3,9 +3,9 @@ extern crate nom;
 use nom::{
   branch::alt,
   bytes::complete::{is_a, tag},
-  character::complete::{char, one_of},
+  character::complete::{char, one_of, space0},
   combinator::{map, recognize},
-  sequence::{pair, preceded},
+  sequence::{delimited, pair, preceded},
   multi::{fold_many0, separated_list1},
   number::complete,
   IResult
@@ -83,13 +83,13 @@ fn parse_var(s: &str) -> IResult<&str, Expr> {
 }
 
 pub fn parse_term(s: &str) -> IResult<&str, Expr> {
-  return alt((parse_float, parse_var))(s);
+  return delimited(space0, alt((parse_float, parse_var)))(s);
 }
 
 pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
-  return alt((parse_bin_op1, parse_term))(s);
+  return delimited(space0, alt((parse_bin_op1, parse_term)))(s);
 }
 
 pub fn parse_program(s: &str) -> IResult<&str, Program> {
-  return nom::combinator::all_consuming(separated_list1(tag(";"), parse_expr))(s);
+  return nom::combinator::all_consuming(separated_list1(delimited(space0, tag(";")), delimited(space0, parse_expr)))(s);
 }
