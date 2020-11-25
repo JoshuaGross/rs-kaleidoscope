@@ -58,5 +58,8 @@ fn parse_expr_test() {
       ])
     ]
   )));
+
+  // extern
+  assert_eq!(parser::parse_program("extern foobar(param1 param2 param3)"), Ok(("", vec![Expr::Extern("foobar".to_string(), vec!["param1".to_string(), "param2".to_string(), "param3".to_string()])])));
 }
 
