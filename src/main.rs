@@ -80,5 +80,6 @@ fn parse_expr_test() {
   // TODO: figure out how to test errors
   //assert_eq!(parse_expr("1five"), Err(nom::Err::Error("five", nom::Err::Eof)));
   assert_eq!(parse_expr("1five"), Err(nom::Err::Error(nom::error::Error::new(&"five"[..], nom::error::ErrorKind::Eof))));
+  assert_eq!(parse_expr("five1"), Err(nom::Err::Error(nom::error::Error::new(&"1"[..], nom::error::ErrorKind::Eof))));
 }
 
