@@ -146,7 +146,7 @@ pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_program_partial(s: &str) -> IResult<&str, Program> {
-  return separated_list1(tag(";"), parse_expr)(s);
+  return separated_list1(delimited(space0, tag(";"), space0), parse_expr)(s);
 }
 
 pub fn parse_program(s: &str) -> IResult<&str, Program> {
