@@ -19,7 +19,7 @@ fn parse_expr_test() {
 
   // Errors with basic parsing
   assert_eq!(parser::parse_program("1five"), Err(nom::Err::Error(nom::error::Error::new(&"five"[..], nom::error::ErrorKind::Eof))));
-  assert_eq!(parser::parse_program("five 1"), Err(nom::Err::Error(nom::error::Error::new(&"1"[..], nom::error::ErrorKind::Eof))));
+  assert_eq!(parser::parse_program("five 1"), Err(nom::Err::Error(nom::error::Error::new(&" 1"[..], nom::error::ErrorKind::Eof))));
 
   // Parse basic arithmetic
   assert_eq!(parser::parse_program("five+1.4"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Var("five".to_string())), Box::new(Expr::Float(1.4)))])));
@@ -31,5 +31,32 @@ fn parse_expr_test() {
 
   // Parse arithmetic with parenthetical
   assert_eq!(parser::parse_program("5 * (6 + 7)"), Ok(("", vec![Expr::BinOp(Op::Multiply, Box::new(Expr::Float(5.0)), Box::new(Expr::BinOp(Op::Plus, Box::new(Expr::Float(6.0)), Box::new(Expr::Float(7.0)))))])));
+
+  // Parse call
+  assert_eq!(parser::parse_program("foobar()"), Ok(("", vec![Expr::Call("foobar".to_string(), vec![])])));
+  assert_eq!(parser::parse_program("foobar(1, 2)"), Ok(("", vec![Expr::Call("foobar".to_string(), vec![Expr::Float(1.0), Expr::Float(2.0)])])));
+  assert_eq!(parser::parse_program("foobar(1, 2, 3+4)"), Ok(("", vec![Expr::Call("foobar".to_string(), vec![Expr::Float(1.0), Expr::Float(2.0), Expr::BinOp(Op::Plus, Box::new(Expr::Float(3.0)), Box::new(Expr::Float(4.0)))])])));
+  assert_eq!(parser::parse_program("foobar(1, 2, 3+4, baz() )"), Ok(("", vec![Expr::Call("foobar".to_string(), vec![Expr::Float(1.0), Expr::Float(2.0), Expr::BinOp(Op::Plus, Box::new(Expr::Float(3.0)), Box::new(Expr::Float(4.0))), Expr::Call("baz".to_string(), vec![])])])));
+
+  // Parse function definitions
+  assert_eq!(parser::parse_program("def foobar(term1 term2 term3) { baz(term1 + term2 + term3) }"), Ok(("",
+    vec![
+      Expr::Function("foobar".to_string(),
+        vec!["term1".to_string(), "term2".to_string(), "term3".to_string()],
+        vec![Expr::Call(
+          "baz".to_string(),
+          vec![
+            Expr::BinOp(Op::Plus,
+                        Box::new(Expr::BinOp(Op::Plus,
+                                             Box::new(Expr::Var("term1".to_string())),
+                                             Box::new(Expr::Var("term2".to_string()))
+                                             )),
+                        Box::new(Expr::Var("term3".to_string()))
+                       )
+          ]
+        )
+      ])
+    ]
+  )));
 }
 

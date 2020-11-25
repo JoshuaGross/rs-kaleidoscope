@@ -6,9 +6,9 @@ use nom::{
   character::complete::{char, one_of, space0},
   combinator::{map, recognize},
   sequence::{delimited, pair, preceded},
-  multi::{fold_many0, separated_list1},
+  multi::{fold_many0, separated_list0, separated_list1},
   number::complete,
-  IResult
+  IResult,
 };
 
 type Name = String;
@@ -18,9 +18,9 @@ pub enum Expr {
   Float(f32),
   Var(Name),
   BinOp(Op, Box<Expr>, Box<Expr>),
-  /*Call(Name, ExprList),
-  Function(Name, ExprList, Box<Expr>),
-  Extern(Name, ExprList)*/
+  Call(Name, Program),
+  Function(Name, Vec<Name>, Program),
+  /*Extern(Name, ExprList)*/
 }
 
 pub type Program = Vec<Expr>;
@@ -40,10 +40,10 @@ fn parse_bin_op2(s: &str) -> IResult<&str, Expr> {
   // fold expressions
   fold_many0(
     pair(
-      alt((
+      delimited(space0, alt((
         map(char('*'), |_| Op::Multiply),
         map(char('/'), |_| Op::Divide)
-      )),
+      )), space0),
       parse_term
     ),
     init,
@@ -58,10 +58,10 @@ fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
   // fold expressions
   fold_many0(
     pair(
-      alt((
+      delimited(space0, alt((
         map(char('+'), |_| Op::Plus),
         map(char('-'), |_| Op::Minus)
-      )),
+      )), space0),
       parse_bin_op2
     ),
     init,
@@ -75,7 +75,7 @@ fn parse_float(s: &str) -> IResult<&str, Expr> {
   Ok((s, Expr::Float(num)))
 }
 
-fn parse_var(s: &str) -> IResult<&str, Expr> {
+fn parse_ident(s: &str) -> IResult<&str, String> {
   let initial_chars: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
   let remaining_chars: &str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
@@ -91,14 +91,42 @@ fn parse_var(s: &str) -> IResult<&str, Expr> {
     )
   )(s)?;
 
-  Ok((s, Expr::Var(ident.to_string())))
+  Ok((s, ident.to_string()))
 }
 
-pub fn parse_term(s: &str) -> IResult<&str, Expr> {
-  return delimited(space0, alt((parse_float, parse_var, parse_parenthetical_term)), space0)(s);
+fn parse_var(s: &str) -> IResult<&str, Expr> {
+  let (s, ident) = parse_ident(s)?;
+  Ok((s, Expr::Var(ident)))
 }
 
-pub fn parse_parenthetical_term(s: &str) -> IResult<&str, Expr> {
+fn parse_call(s: &str) -> IResult<&str, Expr> {
+  let (s, ident) = parse_ident(s)?;
+  let (s, _) = delimited(space0, is_a("("), space0)(s)?;
+  let (s, expr_list) = separated_list0(delimited(space0, tag(","), space0), parse_expr)(s)?;
+  let (s, _) = delimited(space0, is_a(")"), space0)(s)?;
+  Ok((s, Expr::Call(ident, expr_list)))
+}
+
+fn parse_fn_def(s: &str) -> IResult<&str, Expr> {
+  let (s, _) = delimited(space0, tag("def "), space0)(s)?;
+  let (s, name) = parse_ident(s)?;
+  let (s, _) = delimited(space0, is_a("("), space0)(s)?;
+  let (s, ident_list) = separated_list0(tag(" "), parse_ident)(s)?;
+  let (s, _) = delimited(space0, is_a(")"), space0)(s)?;
+  let (s, _) = delimited(space0, is_a("{"), space0)(s)?;
+  let (s, expr_list) = parse_program_partial(s)?;
+  let (s, _) = delimited(space0, is_a("}"), space0)(s)?;
+
+  //Ok((s, Expr::Function(name, ident_list, Vec::new())))
+  Ok((s, Expr::Function(name, ident_list, expr_list)))
+  //Ok((s, Expr::Function(name, Vec::new(), Vec::new())))
+}
+
+fn parse_term(s: &str) -> IResult<&str, Expr> {
+  return alt((parse_call, parse_float, parse_var, parse_parenthetical_term))(s);
+}
+
+fn parse_parenthetical_term(s: &str) -> IResult<&str, Expr> {
   let (s, _) = is_a("(")(s)?;
   let (s, res) = parse_expr(s)?;
   let (s, _) = is_a(")")(s)?;
@@ -106,9 +134,13 @@ pub fn parse_parenthetical_term(s: &str) -> IResult<&str, Expr> {
 }
 
 pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
-  return delimited(space0, alt((parse_bin_op1, parse_term)), space0)(s);
+  return alt((parse_fn_def, parse_bin_op1))(s);
+}
+
+fn parse_program_partial(s: &str) -> IResult<&str, Program> {
+  return separated_list1(tag(";"), parse_expr)(s);
 }
 
 pub fn parse_program(s: &str) -> IResult<&str, Program> {
-  return nom::combinator::all_consuming(separated_list1(tag(";"), parse_expr))(s);
+  return nom::combinator::all_consuming(parse_program_partial)(s);
 }
