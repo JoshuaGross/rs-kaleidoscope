@@ -28,5 +28,8 @@ fn parse_expr_test() {
 
   // Parse arithmetic with precedence
   assert_eq!(parser::parse_program("5 + 6 * 7"), Ok(("", vec![Expr::BinOp(Op::Plus, Box::new(Expr::Float(5.0)), Box::new(Expr::BinOp(Op::Multiply, Box::new(Expr::Float(6.0)), Box::new(Expr::Float(7.0)))))])));
+
+  // Parse arithmetic with parenthetical
+  assert_eq!(parser::parse_program("5 * (6 + 7)"), Ok(("", vec![Expr::BinOp(Op::Multiply, Box::new(Expr::Float(5.0)), Box::new(Expr::BinOp(Op::Plus, Box::new(Expr::Float(6.0)), Box::new(Expr::Float(7.0)))))])));
 }
 

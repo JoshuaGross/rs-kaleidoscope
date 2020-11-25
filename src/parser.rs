@@ -95,7 +95,14 @@ fn parse_var(s: &str) -> IResult<&str, Expr> {
 }
 
 pub fn parse_term(s: &str) -> IResult<&str, Expr> {
-  return delimited(space0, alt((parse_float, parse_var)), space0)(s);
+  return delimited(space0, alt((parse_float, parse_var, parse_parenthetical_term)), space0)(s);
+}
+
+pub fn parse_parenthetical_term(s: &str) -> IResult<&str, Expr> {
+  let (s, _) = is_a("(")(s)?;
+  let (s, res) = parse_expr(s)?;
+  let (s, _) = is_a(")")(s)?;
+  Ok((s, res))
 }
 
 pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
