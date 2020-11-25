@@ -25,12 +25,6 @@ pub enum Expr {
 
 pub type Program = Vec<Expr>;
 
-/*#[derive(Debug,PartialEq)]
-enum ExprList {
-  Cons(Box<Expr>, Box<ExprList>),
-  Nil
-}*/
-
 #[derive(Clone, Debug,PartialEq)]
 pub enum Op {
   Plus,
