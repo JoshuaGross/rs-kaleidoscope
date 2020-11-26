@@ -3,7 +3,7 @@ extern crate nom;
 use nom::{
   branch::alt,
   bytes::complete::{is_a, tag},
-  character::complete::{char, one_of, space0},
+  character::complete::{char, one_of, multispace0},
   combinator::{map, recognize},
   sequence::{delimited, pair, preceded},
   multi::{fold_many0, separated_list0, separated_list1},
@@ -40,10 +40,10 @@ fn parse_bin_op2(s: &str) -> IResult<&str, Expr> {
   // fold expressions
   fold_many0(
     pair(
-      delimited(space0, alt((
+      delimited(multispace0, alt((
         map(char('*'), |_| Op::Multiply),
         map(char('/'), |_| Op::Divide)
-      )), space0),
+      )), multispace0),
       parse_term
     ),
     init,
@@ -58,10 +58,10 @@ fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
   // fold expressions
   fold_many0(
     pair(
-      delimited(space0, alt((
+      delimited(multispace0, alt((
         map(char('+'), |_| Op::Plus),
         map(char('-'), |_| Op::Minus)
-      )), space0),
+      )), multispace0),
       parse_bin_op2
     ),
     init,
@@ -101,31 +101,31 @@ fn parse_var(s: &str) -> IResult<&str, Expr> {
 
 fn parse_call(s: &str) -> IResult<&str, Expr> {
   let (s, ident) = parse_ident(s)?;
-  let (s, _) = delimited(space0, is_a("("), space0)(s)?;
-  let (s, expr_list) = separated_list0(delimited(space0, tag(","), space0), parse_expr)(s)?;
-  let (s, _) = delimited(space0, is_a(")"), space0)(s)?;
+  let (s, _) = delimited(multispace0, is_a("("), multispace0)(s)?;
+  let (s, expr_list) = separated_list0(delimited(multispace0, tag(","), multispace0), parse_expr)(s)?;
+  let (s, _) = delimited(multispace0, is_a(")"), multispace0)(s)?;
   Ok((s, Expr::Call(ident, expr_list)))
 }
 
 fn parse_fn_def(s: &str) -> IResult<&str, Expr> {
-  let (s, _) = delimited(space0, tag("def "), space0)(s)?;
+  let (s, _) = delimited(multispace0, tag("def "), multispace0)(s)?;
   let (s, name) = parse_ident(s)?;
-  let (s, _) = delimited(space0, is_a("("), space0)(s)?;
+  let (s, _) = delimited(multispace0, is_a("("), multispace0)(s)?;
   let (s, ident_list) = separated_list0(tag(" "), parse_ident)(s)?;
-  let (s, _) = delimited(space0, is_a(")"), space0)(s)?;
-  let (s, _) = delimited(space0, is_a("{"), space0)(s)?;
+  let (s, _) = delimited(multispace0, is_a(")"), multispace0)(s)?;
+  let (s, _) = delimited(multispace0, is_a("{"), multispace0)(s)?;
   let (s, expr_list) = parse_program_partial(s)?;
-  let (s, _) = delimited(space0, is_a("}"), space0)(s)?;
+  let (s, _) = delimited(multispace0, is_a("}"), multispace0)(s)?;
 
   Ok((s, Expr::Function(name, ident_list, expr_list)))
 }
 
 fn parse_extern_decl(s: &str) -> IResult<&str, Expr> {
-  let (s, _) = delimited(space0, tag("extern "), space0)(s)?;
+  let (s, _) = delimited(multispace0, tag("extern "), multispace0)(s)?;
   let (s, name) = parse_ident(s)?;
-  let (s, _) = delimited(space0, is_a("("), space0)(s)?;
+  let (s, _) = delimited(multispace0, is_a("("), multispace0)(s)?;
   let (s, ident_list) = separated_list0(tag(" "), parse_ident)(s)?;
-  let (s, _) = delimited(space0, is_a(")"), space0)(s)?;
+  let (s, _) = delimited(multispace0, is_a(")"), multispace0)(s)?;
 
   Ok((s, Expr::Extern(name, ident_list)))
 }
@@ -146,7 +146,7 @@ pub fn parse_expr(s: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_program_partial(s: &str) -> IResult<&str, Program> {
-  return separated_list1(delimited(space0, tag(";"), space0), parse_expr)(s);
+  return separated_list1(delimited(multispace0, tag(";"), multispace0), parse_expr)(s);
 }
 
 pub fn parse_program(s: &str) -> IResult<&str, Program> {
