@@ -1,34 +1,3 @@
-def unary!(v)
-  if v then
-    0
-  else
-    1;
-
-def unary-(v)
-  0-v;
-
-def binary> 10 (LHS RHS)
-  RHS < LHS;
-
-def binary| 5 (LHS RHS)
-  if LHS then
-    1
-  else if RHS then
-    1
-  else
-    0;
-
-def binary& 6 (LHS RHS)
-  if !LHS then
-    0
-  else
-    !!RHS;
-
-def binary= 9 (LHS RHS)
-  !(LHS < RHS | LHS > RHS);
-
-def binary : 1 (x y) y;
-
 extern putchard(char);
 
 def printdensity(d)
