@@ -2,8 +2,73 @@ mod parser;
 
 use std::fs::File;
 use std::io::prelude::*;
+use std::error::Error;
 
-fn main() -> std::io::Result<()> {
+use inkwell::builder::Builder;
+use inkwell::context::Context;
+use inkwell::module::Module;
+use inkwell::passes::PassManager;
+use inkwell::values::{FunctionValue};
+use inkwell::{OptimizationLevel};
+use inkwell::execution_engine::{ExecutionEngine, JitFunction};
+
+/// Convenience type alias for the `sum` function.
+///
+/// Calling this is innately `unsafe` because there's no guarantee it doesn't
+/// do `unsafe` operations internally.
+type SumFunc = unsafe extern "C" fn(u64, u64, u64) -> u64;
+
+pub struct CodeGen<'a, 'ctx> {
+    pub context: &'ctx Context,
+    pub module: Module<'ctx>,
+    pub builder: Builder<'ctx>,
+    pub fpm: &'a PassManager<FunctionValue<'ctx>>,
+    pub execution_engine: ExecutionEngine<'ctx>,
+    // pub function: &'a Function,
+}
+
+impl<'a, 'ctx> CodeGen<'a, 'ctx> {
+    fn jit_compile_sum(&self) -> Option<JitFunction<SumFunc>> {
+        let i64_type = self.context.i64_type();
+        let fn_type = i64_type.fn_type(&[i64_type.into(), i64_type.into(), i64_type.into()], false);
+        let function = self.module.add_function("sum", fn_type, None);
+        let basic_block = self.context.append_basic_block(function, "entry");
+
+        self.builder.position_at_end(basic_block);
+
+        let x = function.get_nth_param(0)?.into_int_value();
+        let y = function.get_nth_param(1)?.into_int_value();
+        let z = function.get_nth_param(2)?.into_int_value();
+
+        let sum = self.builder.build_int_add(x, y, "sum");
+        let sum = self.builder.build_int_add(sum, z, "sum");
+
+        self.builder.build_return(Some(&sum));
+
+        // Verify the function
+        if function.verify(true) {
+          // Print function before optimization
+          println!("Function before optimization:");
+          function.print_to_stderr();
+
+          // Optimize the function
+          self.fpm.run_on(&function);
+
+          // Print function after optimization
+          println!("Function after optimization:");
+          function.print_to_stderr();
+
+          // JIT compile the function
+          unsafe { self.execution_engine.get_function("sum").ok() }
+        } else {
+          unsafe { function.delete(); }
+
+          None
+        }
+    }
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
   let filename = std::env::args().nth(1).expect("no filename given");
 
   let mut file = File::open(filename)?;
@@ -12,6 +77,41 @@ fn main() -> std::io::Result<()> {
 
   let res = parser::parse_program(&contents).unwrap();
   println!("Parsed: {:?}", res.1);
+
+  // Create codegen
+  let context = Context::create();
+  let module = context.create_module("sum"); // could be repl, tmp, etc
+  let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None)?;
+  let fpm = PassManager::create(&module);
+
+  fpm.add_instruction_combining_pass();
+  fpm.add_reassociate_pass();
+  fpm.add_gvn_pass();
+  fpm.add_cfg_simplification_pass();
+  fpm.add_basic_alias_analysis_pass();
+  fpm.add_promote_memory_to_register_pass();
+  fpm.add_instruction_combining_pass();
+  fpm.add_reassociate_pass();
+
+  fpm.initialize();
+
+  let codegen = CodeGen {
+      context: &context,
+      module,
+      builder: context.create_builder(),
+      fpm: &fpm,
+      execution_engine,
+  };
+
+  let sum_fn = codegen.jit_compile_sum().ok_or("Unable to JIT compile `sum`")?;
+
+  let x = 1u64;
+  let y = 2u64;
+  let z = 3u64;
+  let res = unsafe { sum_fn.call(x, y, z) };
+  println!("{} + {} + {} = {}", x, y, z, res);
+  assert_eq!(res, x + y + z);
+
   Ok(())
 }
 
