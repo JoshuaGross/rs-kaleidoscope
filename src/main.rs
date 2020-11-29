@@ -1,14 +1,17 @@
 mod parser;
 mod codegen;
+mod ast;
 
 use std::fs::File;
 use std::io::prelude::*;
 use std::error::Error;
 
 use inkwell::context::Context;
-use inkwell::{OptimizationLevel};
 use inkwell::passes::PassManager;
 
+/**
+ * main
+ */
 fn main() -> Result<(), Box<dyn Error>> {
   let filename = std::env::args().nth(1).expect("no filename given");
 
@@ -16,15 +19,13 @@ fn main() -> Result<(), Box<dyn Error>> {
   let mut contents = String::new();
   file.read_to_string(&mut contents)?;
 
-  let res = parser::parse_program(&contents).unwrap();
-  println!("Parsed: {:?}", res.1);
+  let parser_res = parser::parse_program(&contents).unwrap().1;
+  println!("Parsed: {:?}", parser_res);
 
   // Create codegen
   let context = Context::create();
-  let module = context.create_module("sum"); // could be repl, tmp, etc
-  let execution_engine = module.create_jit_execution_engine(OptimizationLevel::None)?;
-  let fpm = PassManager::create(&module);
-
+  let module = Box::new(context.create_module("tmp")); // could be repl, tmp, etc
+  let fpm = PassManager::create(&*module);
   fpm.add_instruction_combining_pass();
   fpm.add_reassociate_pass();
   fpm.add_gvn_pass();
@@ -33,25 +34,15 @@ fn main() -> Result<(), Box<dyn Error>> {
   fpm.add_promote_memory_to_register_pass();
   fpm.add_instruction_combining_pass();
   fpm.add_reassociate_pass();
-
   fpm.initialize();
 
-  let codegen = codegen::CodeGen {
-      context: &context,
-      module,
-      builder: context.create_builder(),
-      fpm: &fpm,
-      execution_engine,
-  };
+  let mut codegen = codegen::CodeGen::mk_compiler(&context, &fpm, module)?;
+  codegen.compile_program(&parser_res)?;
 
-  let sum_fn = codegen.jit_compile_sum().ok_or("Unable to JIT compile `sum`")?;
+  let main_fn = codegen.jit_compile_main().ok_or("Unable to JIT compile `main`")?;
 
-  let x = 1u64;
-  let y = 2u64;
-  let z = 3u64;
-  let res = unsafe { sum_fn.call(x, y, z) };
-  println!("{} + {} + {} = {}", x, y, z, res);
-  assert_eq!(res, x + y + z);
+  // Execute the main fn of the JOT-compiled program
+  unsafe { main_fn.call() };
 
   Ok(())
 }
@@ -115,4 +106,3 @@ fn parse_expr_test() {
   // This looks correct
   //assert_eq!(parser::parse_program("extern foobar(param1 param2 param3); def foo(item1) { foobar(item1 + 2); baz(17) }"), Ok(("", vec![Expr::Extern("foobar".to_string(), vec!["param1".to_string(), "param2".to_string(), "param3".to_string()])])));
 }
-

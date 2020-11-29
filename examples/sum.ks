@@ -1,4 +1,7 @@
+extern printd(char);
+
 def sum(x y z)
   x + y + z;
 
-sum(1, 2, 3)
+def main()
+  printd(sum(1, 2, 7));

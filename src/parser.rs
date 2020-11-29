@@ -1,5 +1,7 @@
 extern crate nom;
 
+use crate::ast::{Expr, Op, Program};
+
 use nom::{
   branch::alt,
   bytes::complete::{is_a, tag, take_while, take_until},
@@ -10,35 +12,6 @@ use nom::{
   number::streaming,
   IResult,
 };
-
-type Name = String;
-
-#[derive(Clone, Debug,PartialEq)]
-pub enum Expr {
-  Float(f32),
-  Var(Name),
-  BinOp(Op, Box<Expr>, Box<Expr>),
-  Call(Name, Program),
-  Function(Name, Vec<Name>, Program),
-  IfExpr(Box<Expr>, Box<Expr>, Box<Expr>),
-  ForInExpr(Name, Box<Expr>, Box<Expr>, Box<Expr>, Box<Expr>),
-  Extern(Name, Vec<Name>),
-  Sequence(Box<Expr>, Box<Expr>) // Same as "program", just different to make parsing easier for "colon" operator
-}
-
-pub type Program = Vec<Expr>;
-
-#[derive(Clone, Debug,PartialEq)]
-pub enum Op {
-  Plus,
-  Minus,
-  Multiply,
-  Divide,
-  LessThan,
-  GreaterThan,
-  BitwiseOr,
-  BitwiseAnd,
-}
 
 fn parse_bin_op4(s: &str) -> IResult<&str, Expr> {
   // Parse left/first expr
@@ -113,7 +86,7 @@ fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_float(s: &str) -> IResult<&str, Expr> {
-  let (s, num) = streaming::float(s)?;
+  let (s, num) = streaming::double(s)?;
 
   Ok((s, Expr::Float(num)))
 }
@@ -160,10 +133,8 @@ fn parse_fn_def(s: &str) -> IResult<&str, Expr> {
 
   // The body of the function is comprised of a single expression
   let (s, body) = parse_inner_expr(s)?;
-  let mut expr_list = Vec::new();
-  expr_list.push(body);
 
-  Ok((s, Expr::Function(name, ident_list, expr_list)))
+  Ok((s, Expr::Function(name, ident_list, Box::new(body))))
 }
 
 fn parse_if_stmt(s: &str) -> IResult<&str, Expr> {
