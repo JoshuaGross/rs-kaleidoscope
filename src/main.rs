@@ -13,6 +13,8 @@ use inkwell::passes::PassManager;
  * main
  */
 fn main() -> Result<(), Box<dyn Error>> {
+  let args: Vec<String> = env::args().collect();
+
   let filename = std::env::args().nth(1).expect("no filename given");
 
   let mut file = File::open(filename)?;
