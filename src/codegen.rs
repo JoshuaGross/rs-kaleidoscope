@@ -107,9 +107,9 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
 
                 match &*op {
                     Op::Plus        => Ok(self.builder.build_float_add(lhs, rhs, "tmpadd")),
-                    Op::Minus       => Ok(self.builder.build_float_add(lhs, rhs, "tmpsub")),
-                    Op::Divide      => Ok(self.builder.build_float_add(lhs, rhs, "tmpdiv")),
-                    Op::Multiply    => Ok(self.builder.build_float_add(lhs, rhs, "tmpmul")),
+                    Op::Minus       => Ok(self.builder.build_float_sub(lhs, rhs, "tmpsub")),
+                    Op::Divide      => Ok(self.builder.build_float_div(lhs, rhs, "tmpdiv")),
+                    Op::Multiply    => Ok(self.builder.build_float_mul(lhs, rhs, "tmpmul")),
                     Op::LessThan    => Ok({
                         let cmp = self.builder.build_float_compare(FloatPredicate::ULT, lhs, rhs, "tmpcmp");
                         self.builder.build_unsigned_int_to_float(cmp, self.context.f64_type(), "tmpbool")
@@ -120,6 +120,48 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     }),
                     _ => Err("Unsupported binary operation")
                 }
+            },
+
+            Expr::IfExpr(ref cond, ref consequence, ref alternative) => {
+                let parent = self.fn_value();
+
+                // create condition by comparing without 0.0 and returning an int
+                let zero_const = self.context.f64_type().const_float(0.0);
+                let cond = self.compile_expr(cond)?;
+                let cond = self.builder.build_float_compare(FloatPredicate::ONE, cond, zero_const, "ifcond");
+
+                // build branch
+                let then_bb = self.context.append_basic_block(parent, "then");
+                let else_bb = self.context.append_basic_block(parent, "else");
+                let cont_bb = self.context.append_basic_block(parent, "ifcont");
+
+                self.builder.build_conditional_branch(cond, then_bb, else_bb);
+
+                // build then block
+                self.builder.position_at_end(then_bb);
+                let then_val = self.compile_expr(consequence)?;
+                self.builder.build_unconditional_branch(cont_bb);
+
+                let then_bb = self.builder.get_insert_block().unwrap();
+
+                // build else block
+                self.builder.position_at_end(else_bb);
+                let else_val = self.compile_expr(alternative)?;
+                self.builder.build_unconditional_branch(cont_bb);
+
+                let else_bb = self.builder.get_insert_block().unwrap();
+
+                // emit merge block
+                self.builder.position_at_end(cont_bb);
+
+                let phi = self.builder.build_phi(self.context.f64_type(), "iftmp");
+
+                phi.add_incoming(&[
+                    (&then_val, then_bb),
+                    (&else_val, else_bb)
+                ]);
+
+                Ok(phi.as_basic_value().into_float_value())
             },
 
             Expr::Call(ref fn_name, ref args) => {
@@ -140,6 +182,53 @@ impl<'a, 'ctx> CodeGen<'a, 'ctx> {
                     },
                     None => Err("Unknown function.")
                 }
+            },
+
+            Expr::ForInExpr(ref var_name, ref initial_val, ref end_cond, ref step, ref body) => {
+                let parent = self.fn_value();
+
+                let start_alloca = self.create_entry_block_alloca(var_name);
+                let start = self.compile_expr(initial_val)?;
+
+                self.builder.build_store(start_alloca, start);
+
+                // go from current block to loop block
+                let loop_bb = self.context.append_basic_block(parent, "loop");
+
+                self.builder.build_unconditional_branch(loop_bb);
+                self.builder.position_at_end(loop_bb);
+
+                let old_val = self.variables.remove(var_name.as_str());
+
+                self.variables.insert(var_name.to_owned(), start_alloca);
+
+                // emit body
+                self.compile_expr(body)?;
+
+                // emit step
+                let step = self.compile_expr(step)?;
+
+                // compile end condition
+                let end_cond = self.compile_expr(end_cond)?;
+
+                let curr_var = self.builder.build_load(start_alloca, var_name);
+                let next_var = self.builder.build_float_add(curr_var.into_float_value(), step, "nextvar");
+
+                self.builder.build_store(start_alloca, next_var);
+
+                let end_cond = self.builder.build_float_compare(FloatPredicate::ONE, end_cond, self.context.f64_type().const_float(0.0), "loopcond");
+                let after_bb = self.context.append_basic_block(parent, "afterloop");
+
+                self.builder.build_conditional_branch(end_cond, loop_bb, after_bb);
+                self.builder.position_at_end(after_bb);
+
+                self.variables.remove(var_name);
+
+                if let Some(val) = old_val {
+                    self.variables.insert(var_name.to_owned(), val);
+                }
+
+                Ok(self.context.f64_type().const_float(0.0))
             },
 
             x => {

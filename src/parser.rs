@@ -5,10 +5,10 @@ use crate::ast::{Expr, Op, Program};
 use nom::{
   branch::alt,
   bytes::complete::{is_a, tag, take_while, take_until},
-  character::complete::{char, one_of, multispace0, multispace1},
+  character::complete::{char, digit1, one_of, none_of, multispace0, multispace1},
   combinator::{map, recognize},
   sequence::{pair, preceded, terminated},
-  multi::{fold_many0, fold_many_m_n, many0, separated_list0, separated_list1},
+  multi::{fold_many0, many0, separated_list0, separated_list1},
   number::streaming,
   IResult,
 };
@@ -68,20 +68,28 @@ fn parse_bin_op2(s: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_bin_op1(s: &str) -> IResult<&str, Expr> {
+  let reserved_symbols = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789{}();,";
+
   // Parse left/first expr
   let (s, init) = parse_bin_op2(s)?;
 
   // fold expressions
   fold_many0(
     pair(
-      preceded(multispace0, terminated(alt((
-        map(char('|'), |_| Op::BitwiseOr),
-        map(char('&'), |_| Op::BitwiseAnd),
-      )), multispace0)),
+      preceded(multispace0, terminated(none_of(reserved_symbols), multispace0)),
       parse_bin_op2
     ),
     init,
-    |acc, (op, val)| Expr::BinOp(op, Box::new(acc), Box::new(val))
+    |acc, (custom_bin_op, val)| {
+      let mut fn_name: String = "binary".to_owned();
+      fn_name.push_str(&custom_bin_op.to_string());
+
+      let mut args = Vec::new();
+      args.push(acc);
+      args.push(val);
+
+      Expr::Call(fn_name, args)
+    }
   )(s)
 }
 
@@ -125,8 +133,27 @@ fn parse_call(s: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_fn_def(s: &str) -> IResult<&str, Expr> {
+  let reserved_symbols = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789{}();,";
+
   let (s, _) = preceded(multispace0, terminated(tag("def "), multispace0))(s)?;
   let (s, name) = parse_ident(s)?;
+  let (s, symbol) = if name == "binary" {
+    // Fetch the next non-whitespace symbol
+    let mut symbol = name.to_owned();
+    let (s, binary_symbol) = preceded(multispace0, terminated(none_of(reserved_symbols), multispace0))(s)?;
+    symbol.push_str(&binary_symbol.to_string());
+    // This is the precedence of the symbol, which we're just ignoring for now.
+    let (s, _) = preceded(multispace0, terminated(digit1, multispace0))(s)?;
+    (s, symbol)
+  } else if name == "unary" {
+    // Fetch the next non-whitespace symbol
+    let mut symbol = name.to_owned();
+    let (s, unary_symbol) = preceded(multispace0, terminated(none_of(reserved_symbols), multispace0))(s)?;
+    symbol.push_str(&unary_symbol.to_string());
+    (s, symbol)
+  } else {
+    (s, name.to_owned())
+  };
   let (s, _) = preceded(multispace0, terminated(is_a("("), multispace0))(s)?;
   let (s, ident_list) = separated_list0(multispace1, parse_ident)(s)?;
   let (s, _) = preceded(multispace0, terminated(is_a(")"), multispace0))(s)?;
@@ -134,7 +161,7 @@ fn parse_fn_def(s: &str) -> IResult<&str, Expr> {
   // The body of the function is comprised of a single expression
   let (s, body) = parse_inner_expr(s)?;
 
-  Ok((s, Expr::Function(name, ident_list, Box::new(body))))
+  Ok((s, Expr::Function(symbol, ident_list, Box::new(body))))
 }
 
 fn parse_if_stmt(s: &str) -> IResult<&str, Expr> {
@@ -173,8 +200,22 @@ fn parse_extern_decl(s: &str) -> IResult<&str, Expr> {
   Ok((s, Expr::Extern(name, ident_list)))
 }
 
+fn parse_unary_operation(s: &str) -> IResult<&str, Expr> {
+  let reserved_symbols = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789{}();,";
+  let (s, unary_symbol) = preceded(multispace0, terminated(none_of(reserved_symbols), multispace0))(s)?;
+  let (s, term) = parse_term(s)?;
+
+  let mut fn_name: String = "unary".to_owned();
+  fn_name.push_str(&unary_symbol.to_string());
+
+  let mut args = Vec::new();
+  args.push(term);
+
+  Ok((s, Expr::Call(fn_name, args)))
+}
+
 fn parse_term(s: &str) -> IResult<&str, Expr> {
-  return alt((parse_call, parse_float, parse_var, parse_parenthetical_term))(s);
+  return alt((parse_call, parse_float, parse_var, parse_parenthetical_term, parse_unary_operation))(s);
 }
 
 fn parse_parenthetical_term(s: &str) -> IResult<&str, Expr> {
@@ -201,18 +242,7 @@ fn multicomment0(s: &str) -> IResult<&str, ()> {
 }
 
 fn parse_inner_expr(s: &str) -> IResult<&str, Expr> {
-  let (s, initial_expr) = alt((parse_if_stmt, parse_for_in_stmt, parse_bin_op1))(s)?;
-
-  fold_many_m_n(
-    0,
-    1,
-    pair(
-      preceded(multispace0, terminated(tag(":"), multispace0)),
-      parse_inner_expr
-    ),
-    initial_expr,
-    |acc, (_, expr)| Expr::Sequence(Box::new(acc), Box::new(expr))
-  )(s)
+  alt((parse_if_stmt, parse_for_in_stmt, parse_bin_op1))(s)
 }
 
 fn parse_outer_expr(s: &str) -> IResult<&str, Expr> {

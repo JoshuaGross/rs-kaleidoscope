@@ -10,8 +10,39 @@ def printdensity(d)
   else
     putchard(42);
 
+# Logical unary not.
+def unary!(v)
+  if v then
+    0
+  else
+    1;
+
+# Unary negate.
+def unary-(v)
+  0-v;
+
+# Binary logical or, which does not short circuit.
+def binary| 5 (LHS RHS)
+  if LHS then
+    1
+  else if RHS then
+    1
+  else
+    0;
+
+# Binary logical and, which does not short circuit.
+def binary& 6 (LHS RHS)
+  if !LHS then
+    0
+  else
+    !!RHS;
+
+# Define ':' for sequencing: as a low-precedence operator that ignores operands
+# and just returns the RHS.
+def binary: 1 (x y) y;
+
 def mandelconverger(real imag iters creal cimag)
-  if iters > 255 | (real*real + imag*imag > 4) then
+  if (iters > 255) | (real*real + imag*imag > 4) then
     iters
   else
     mandelconverger( real*real - imag*imag + creal

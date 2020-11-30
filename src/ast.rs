@@ -9,8 +9,7 @@ pub enum Expr {
   Function(Name, Vec<Name>, Box<Expr>),
   IfExpr(Box<Expr>, Box<Expr>, Box<Expr>),
   ForInExpr(Name, Box<Expr>, Box<Expr>, Box<Expr>, Box<Expr>),
-  Extern(Name, Vec<Name>),
-  Sequence(Box<Expr>, Box<Expr>) // Same as "program", just different to make parsing easier for "colon" operator
+  Extern(Name, Vec<Name>)
 }
 
 pub type Program = Vec<Expr>;
@@ -22,7 +21,5 @@ pub enum Op {
   Multiply,
   Divide,
   LessThan,
-  GreaterThan,
-  BitwiseOr,
-  BitwiseAnd,
+  GreaterThan
 }

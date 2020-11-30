@@ -8,4 +8,5 @@ def fib(x)
     fib(x-1)+fib(x-2);
 
 # This expression will compute the 40th number.
-printd(fib(40));
+def main ()
+  printd(fib(40));
